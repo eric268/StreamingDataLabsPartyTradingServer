@@ -103,6 +103,7 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToServerSignifiers.PartyDataSendTransferStart)
         {
+           
             SharingRoom sr = FindSharingRoomWithConnectionID(id);
             sr.transferData = new List<string>();
 
@@ -114,21 +115,20 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToServerSignifiers.PartyDataTransferEnd)
         {
+            Debug.Log("Sending data to player from server");
             SharingRoom sr = FindSharingRoomWithConnectionID(id);
-            int otherPlayerID = -1;
-            if (sr.connectionID.Count > 1)
+            foreach (int pID in sr.connectionID)
             {
-                otherPlayerID = sr.connectionID[1];
-            }
-            else 
-                return;
+                if (pID == id)
+                    continue;
 
-            SendMessageToClient(ServerToClientSignifiers.ServerSendPartyDataTransferStart + "", otherPlayerID);
-            foreach (string d in sr.transferData)
-            {
-                SendMessageToClient(ServerToClientSignifiers.ServerSendingPartyData + "," + d, otherPlayerID);
+                SendMessageToClient(ServerToClientSignifiers.ServerSendPartyDataTransferStart + "", pID);
+                foreach (string d in sr.transferData)
+                {
+                    SendMessageToClient(d, pID);
+                }
+                SendMessageToClient(ServerToClientSignifiers.ServerSendingPartyDataTransferEnd + "", pID);
             }
-            SendMessageToClient(ServerToClientSignifiers.ServerSendPartyDataTransferEnd + "", otherPlayerID);
         }
     }
 
