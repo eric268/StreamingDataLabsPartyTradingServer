@@ -56,6 +56,7 @@ public class NetworkedServer : MonoBehaviour
                 break;
             case NetworkEventType.DisconnectEvent:
                 Debug.Log("Disconnection, " + recConnectionID);
+                PlayerDisconnected(recConnectionID);
                 break;
         }
 
@@ -84,6 +85,11 @@ public class NetworkedServer : MonoBehaviour
                 if (sharingRooms[i].name == roomName)
                 {
                     hasBeenFound = true;
+                    if (sharingRooms[i].connectionID[0] == id)
+                    {
+                        Debug.Log("Player already in room");
+                        break;
+                    }
                     sharingRooms[i].connectionID.Add(id);
                     Debug.Log("Room Joined");
                     break;
@@ -95,6 +101,65 @@ public class NetworkedServer : MonoBehaviour
                 sharingRooms.Add(new SharingRoom(roomName, id));
             }
         }
+        else if (signifier == ClientToServerSignifiers.PartyDataSendTransferStart)
+        {
+            SharingRoom sr = FindSharingRoomWithConnectionID(id);
+            sr.transferData = new List<string>();
+
+        }
+        else if (signifier == ClientToServerSignifiers.PartyDataTransfer)
+        {
+            SharingRoom sr = FindSharingRoomWithConnectionID(id);
+            sr.transferData.Add(msg);
+        }
+        else if (signifier == ClientToServerSignifiers.PartyDataTransferEnd)
+        {
+            SharingRoom sr = FindSharingRoomWithConnectionID(id);
+            int otherPlayerID = -1;
+            if (sr.connectionID.Count > 1)
+            {
+                otherPlayerID = sr.connectionID[1];
+            }
+            else 
+                return;
+
+            SendMessageToClient(ServerToClientSignifiers.ServerSendPartyDataTransferStart + "", otherPlayerID);
+            foreach (string d in sr.transferData)
+            {
+                SendMessageToClient(ServerToClientSignifiers.ServerSendingPartyData + "," + d, otherPlayerID);
+            }
+            SendMessageToClient(ServerToClientSignifiers.ServerSendPartyDataTransferEnd + "", otherPlayerID);
+        }
+    }
+
+    public void PlayerDisconnected(int id)
+    {
+        SharingRoom foundSR = FindSharingRoomWithConnectionID(id);
+
+        if (foundSR != null)
+        {
+            foundSR.connectionID.Remove(id);
+            Debug.Log("Removing player from room");
+            if (foundSR.connectionID.Count == 0)
+            {
+                sharingRooms.Remove(foundSR);
+                Debug.Log("Removing room from list");
+            }
+
+        }
+    }
+
+    public SharingRoom FindSharingRoomWithConnectionID(int id)
+    {
+        foreach(SharingRoom sr in sharingRooms)
+        {
+            foreach(int pID in sr.connectionID)
+            {
+                if (pID == id)
+                    return sr;
+            }
+        }
+        return null;
     }
 
 }
@@ -103,6 +168,7 @@ public class SharingRoom
 {
     public string name;
     public List<int> connectionID;
+    public List<string> transferData;
 
     public SharingRoom(string n, int creatorID)
     {
@@ -116,9 +182,14 @@ public class SharingRoom
 static public class ClientToServerSignifiers
 {
     public const int JoinSharingRoom = 1;
+    public const int PartyDataSendTransferStart = 101;
+    public const int PartyDataTransfer = 102;
+    public const int PartyDataTransferEnd = 103;
 }
 
 static public class ServerToClientSignifiers
 {
-
+    public const int ServerSendPartyDataTransferStart = 101;
+    public const int ServerSendingPartyData = 102;
+    public const int ServerSendingPartyDataTransferEnd = 103;
 }
